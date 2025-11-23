@@ -109,7 +109,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowMultipleFrameworks", policy =>
     {
         policy.WithOrigins(
-                "http://localhost:3000",  // ← React App
+                "http://localhost:5173",  // ← React App
                 "http://localhost:8080",  // ← Vue App
                 "https://localhost:3000", // ← HTTPS versions
                 "https://localhost:8080"
@@ -131,6 +131,9 @@ if (app.Environment.IsDevelopment())
 
 // Enable CORS
 app.UseCors("AllowMultipleFrameworks");
+
+// 📁 Enable static files (for database-management.html and other static content)
+app.UseStaticFiles();
 
 // ?? Use Cookie Policy (for automatic token management)
 app.UseCookiePolicy();

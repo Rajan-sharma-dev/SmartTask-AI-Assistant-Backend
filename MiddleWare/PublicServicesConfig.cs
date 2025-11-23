@@ -1,4 +1,4 @@
-namespace MiddleWareWebApi.MiddleWare
+﻿namespace MiddleWareWebApi.MiddleWare
 {
     /// <summary>
     /// Centralized configuration for public services that don't require authentication
@@ -10,7 +10,7 @@ namespace MiddleWareWebApi.MiddleWare
         /// </summary>
         public static readonly HashSet<string> PublicServices = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            // ?? Authentication services (available without login)
+            // 🔓 Authentication services (available without login)
             "IdentityService.LoginAsync",
             "IdentityService.RegisterAsync", 
             "IdentityService.RefreshTokenAsync",
@@ -19,7 +19,7 @@ namespace MiddleWareWebApi.MiddleWare
             "IdentityService.VerifyEmailAsync",
             "IdentityService.ResendVerificationAsync",
             
-            // ?? Public user services (for registration validation)
+            // 🔓 Public user services (for registration validation)
             "UserService.GetUserByUsernameAsync",   // For login validation
             "UserService.GetUserByEmailAsync",      // For login validation  
             "UserService.CheckUsernameExistsAsync", // For registration validation
@@ -27,12 +27,12 @@ namespace MiddleWareWebApi.MiddleWare
             "UserService.CreateUserAsync",          // For registration
             "UserService.UpdatePasswordAsync",      // For password reset
             
-            // ?? Health check services
+            // 🔓 Health check services
             "HealthService.GetHealthStatusAsync",
             "SystemService.GetPublicInfoAsync",
             "SystemService.GetVersionAsync",
             
-            // ?? Public information services
+            // 🔓 Public information services
             "InfoService.GetPublicSettingsAsync",
             "InfoService.GetTermsOfServiceAsync",
             "InfoService.GetPrivacyPolicyAsync"
@@ -94,7 +94,7 @@ namespace MiddleWareWebApi.MiddleWare
             var segments = context.Request.Path.Value?.Split('/');
             
             // Check if this is a dynamic service call: /api/services/{ServiceName}/{MethodName}
-            if (segments != null && segments.Length > 5 && 
+            if (segments != null && segments.Length >= 5 && 
                 segments[1].Equals("api", StringComparison.OrdinalIgnoreCase) &&
                 segments[2].Equals("services", StringComparison.OrdinalIgnoreCase))
             {
@@ -123,11 +123,11 @@ namespace MiddleWareWebApi.MiddleWare
         {
             if (IsPublicService(serviceName, methodName))
             {
-                return "?? Public Service (No authentication required)";
+                return "🔓 Public Service (No authentication required)";
             }
             else
             {
-                return "?? Protected Service (Authentication required)";
+                return "🔒 Protected Service (Authentication required)";
             }
         }
 
