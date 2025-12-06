@@ -73,17 +73,7 @@ namespace MiddleWareWebApi.Services
             {
                 using var connection = _context.CreateConnection();
 
-                // Check if user already exists
-                var existingUser = await connection.QueryFirstOrDefaultAsync<User>(
-                    "SELECT * FROM Users WHERE Email = @Email OR Username = @Username", 
-                    new { Email = request.Email, Username = request.Username });
-
-                if (existingUser != null)
-                {
-                    _logger.LogWarning("Registration attempt with existing email/username: {Email}/{Username}", 
-                        request.Email, request.Username);
-                    return null;
-                }
+               
 
                 var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
