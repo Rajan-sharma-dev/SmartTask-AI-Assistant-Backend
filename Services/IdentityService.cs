@@ -72,8 +72,16 @@ namespace MiddleWareWebApi.Services
             try
             {
                 using var connection = _context.CreateConnection();
+                //check if user exit below
+                var existingUser = await connection.QueryFirstOrDefaultAsync<User>(
+                    "SELECT * FROM Users WHERE Email = @Email OR Username = @Username", 
+                    new { Email = request.Email, Username = request.Username });
+                if (existingUser != null) {
+                    _logger.LogWarning("Registration attempt with existing email or username: {Email}, {Username}", request.Email, request.Username);
+                    return null;
+                }
 
-               
+
 
                 var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
@@ -86,23 +94,31 @@ namespace MiddleWareWebApi.Services
                     PhoneNumber = request.PhoneNumber,
                     Role = "User",
                     IsActive = true,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    Password = request.Password,
+                    ConfirmPassword = request.ConfirmPassword
                 };
 
                 var sql = @"
-                    INSERT INTO Users (Username, Email, PasswordHash, FullName, PhoneNumber, Role, IsActive, CreatedAt) 
+                    INSERT INTO Users (Username, Email,  FullName, PhoneNumber,CreatedAt, Password) 
                     OUTPUT INSERTED.UserId
-                    VALUES (@Username, @Email, @PasswordHash, @FullName, @PhoneNumber, @Role, @IsActive, @CreatedAt)";
+                    VALUES (@Username, @Email, @FullName, @PhoneNumber, @CreatedAt, @Password)";
+                try
+                {
+                    var userId = await connection.QuerySingleAsync<int>(sql, user);
+                    user.UserId = userId;
+                }
+                catch (Exception ex)
+                {
 
-                var userId = await connection.QuerySingleAsync<int>(sql, user);
-                user.UserId = userId;
+                }
 
                 var accessToken = _jwtTokenService.GenerateAccessToken(user);
                 var refreshToken = _jwtTokenService.GenerateRefreshToken();
 
-                await SaveRefreshTokenAsync(userId, refreshToken, ipAddress);
+                await SaveRefreshTokenAsync(user.UserId, refreshToken, ipAddress);
 
-                _logger.LogInformation("User {UserId} successfully registered", userId);
+                _logger.LogInformation("User {UserId} successfully registered", user.UserId);
 
                 return new AuthResponse
                 {

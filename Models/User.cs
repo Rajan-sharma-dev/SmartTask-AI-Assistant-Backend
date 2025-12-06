@@ -59,5 +59,10 @@ namespace MiddleWareWebApi.Models
         [Url]
         [MaxLength(500)]
         public string? ProfilePictureUrl { get; set; }
+
+        [MinLength(6)]
+        [MaxLength(100)]
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
     }
 }
