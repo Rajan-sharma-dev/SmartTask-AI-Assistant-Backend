@@ -9,7 +9,7 @@
 # Secrets and sensitive configuration files
 *.secrets.json
 appsettings.Production.json
-appsettings.Local.json
+appsettings.json
 **/secrets/**
 .env
 .env.local
