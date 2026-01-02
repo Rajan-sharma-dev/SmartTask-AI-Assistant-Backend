@@ -74,14 +74,92 @@ jobs:
         name: .net-app
         path: ./publish
 
-    - name: Replace appsettings for staging
+    - name: Azure Login for Staging Configuration
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS_STAGING }}
+
+    - name: Verify staging deployment prerequisites
       run: |
-        echo "Configuring staging appsettings..."
-        # Replace tokens in appsettings.json with staging environment variables
-        if [ -f "./publish/appsettings.json" ]; then
-          sed -i 's/"your-openai-api-key-here"/"${{ secrets.STAGING_OPENAI_API_KEY }}"/g' ./publish/appsettings.json
-          sed -i 's/Server=localhost\\\\SQLEXPRESS;Database=SmartFitDB;Trusted_Connection=True;TrustServerCertificate=True;/"${{ secrets.STAGING_DATABASE_CONNECTION_STRING }}"/g' ./publish/appsettings.json
+        echo "🔍 Verifying staging deployment prerequisites..."
+        
+        MISSING_SECRETS=0
+        
+        # Check for required secrets (without exposing their values)
+        if [ -z "${{ secrets.STAGING_DATABASE_CONNECTION_STRING }}" ]; then
+          echo "❌ STAGING_DATABASE_CONNECTION_STRING is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ STAGING_DATABASE_CONNECTION_STRING is configured"
         fi
+        
+        if [ -z "${{ secrets.STAGING_JWT_SECRET_KEY }}" ]; then
+          echo "❌ STAGING_JWT_SECRET_KEY is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ STAGING_JWT_SECRET_KEY is configured"
+        fi
+        
+        if [ -z "${{ secrets.STAGING_OPENAI_API_KEY }}" ]; then
+          echo "❌ STAGING_OPENAI_API_KEY is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ STAGING_OPENAI_API_KEY is configured"
+        fi
+        
+        if [ -z "${{ secrets.AZURE_CREDENTIALS_STAGING }}" ]; then
+          echo "❌ AZURE_CREDENTIALS_STAGING is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ AZURE_CREDENTIALS_STAGING is configured"
+        fi
+        
+        if [ $MISSING_SECRETS -eq 1 ]; then
+          echo ""
+          echo "❌ Missing required secrets. Please configure them in GitHub repository settings."
+          exit 1
+        fi
+        
+        echo ""
+        echo "✅ All required secrets are configured"
+
+    - name: Configure Azure App Service Settings (Staging)
+      uses: azure/appservice-settings@v1
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}-staging
+        app-settings-json: |
+          [
+            {
+              "name": "ConnectionStrings__DefaultConnection",
+              "value": "${{ secrets.STAGING_DATABASE_CONNECTION_STRING }}",
+              "slotSetting": false
+            },
+            {
+              "name": "JwtSettings__SecretKey",
+              "value": "${{ secrets.STAGING_JWT_SECRET_KEY }}",
+              "slotSetting": false
+            },
+            {
+              "name": "JwtSettings__Issuer",
+              "value": "SmartTask-AI-Staging",
+              "slotSetting": false
+            },
+            {
+              "name": "JwtSettings__Audience",
+              "value": "SmartTask-AI-Users",
+              "slotSetting": false
+            },
+            {
+              "name": "OpenAi__ApiKey",
+              "value": "${{ secrets.STAGING_OPENAI_API_KEY }}",
+              "slotSetting": false
+            },
+            {
+              "name": "ASPNETCORE_ENVIRONMENT",
+              "value": "Staging",
+              "slotSetting": false
+            }
+          ]
         
     - name: Deploy to Azure Web App (Staging)
       uses: azure/webapps-deploy@v3
@@ -92,9 +170,37 @@ jobs:
 
     - name: Run staging health checks
       run: |
-        echo "Running staging health checks..."
+        echo "🔍 Running staging health checks..."
         sleep 30 # Give app time to start
-        curl -f https://${{ env.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net/health || echo "Health check failed, but continuing..."
+        
+        APP_URL="https://${{ env.AZURE_WEBAPP_NAME }}-staging.azurewebsites.net"
+        
+        # Check if the app is responding
+        for i in {1..5}; do
+          echo "Health check attempt $i of 5..."
+          
+          # Try the health endpoint with detailed error output
+          if curl -f -m 30 -v "$APP_URL/health" 2>&1 | tee /tmp/health_check.log; then
+            echo "✅ Health check passed!"
+            exit 0
+          else
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 30 "$APP_URL/health" || echo "000")
+            echo "❌ Health check attempt $i failed with HTTP code: $HTTP_CODE"
+            
+            # Try just the root endpoint
+            ROOT_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 30 "$APP_URL" || echo "000")
+            echo "Root endpoint HTTP code: $ROOT_CODE"
+            
+            if [ $i -lt 5 ]; then
+              echo "Retrying in 30 seconds..."
+              sleep 30
+            fi
+          fi
+        done
+        
+        echo "⚠️ All health checks failed after 5 attempts"
+        echo "Deployment completed but app may need manual verification."
+        echo "Check Azure App Service logs for detailed error information."
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -110,74 +216,92 @@ jobs:
         name: .net-app
         path: ./publish
 
-    - name: Configure production settings
+    - name: Azure Login for Production Configuration
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Verify production deployment prerequisites
       run: |
-        echo "Configuring production appsettings..."
+        echo "🔍 Verifying production deployment prerequisites..."
         
-        # List available files to debug
-        echo "Available files in publish directory:"
-        ls -la ./publish/
-        find ./publish/ -name "appsettings*.json"
+        MISSING_SECRETS=0
         
-        # Create appsettings.Production.json with actual values (avoiding sed issues)
-        cat > ./publish/appsettings.Production.json << 'EOF'
-        {
-          "ConnectionStrings": {
-            "DefaultConnection": "${{ secrets.DATABASE_CONNECTION_STRING }}"
-          },
-          "JwtSettings": {
-            "SecretKey": "${{ secrets.JWT_SECRET_KEY }}",
-            "Issuer": "SmartTask-AI-Production",
-            "Audience": "SmartTask-AI-Users",
-            "AccessTokenExpirationMinutes": 60,
-            "RefreshTokenExpirationDays": 7
-          },
-          "OpenAi": {
-            "ApiKey": "${{ secrets.OPENAI_API_KEY }}",
-            "BaseUrl": "https://api.openai.com/v1",
-            "DefaultModel": "gpt-4o-mini",
-            "ImageModel": "gpt-4-vision-preview",
-            "MaxTokens": 1500,
-            "Temperature": 0.7,
-            "TopP": 1.0,
-            "TimeoutSeconds": 30,
-            "EnableStreaming": true,
-            "EnableModeration": true,
-            "RequestsPerMinute": 60,
-            "RequestsPerDay": 1000,
-            "EnablePersonalization": true,
-            "EnableCodeAnalysis": true,
-            "DefaultProjectContext": "SmartTask AI Assistant - Intelligent task management system"
-          },
-          "SmartTaskSettings": {
-            "ApplicationName": "SmartTask AI Assistant",
-            "Version": "1.0.0",
-            "Environment": "Production",
-            "Features": {
-              "EnableChatHistory": true,
-              "EnableAITaskResolution": true,
-              "EnableProactiveAssistance": true,
-              "MaxChatHistoryDays": 30,
-              "MaxTasksPerUser": 1000
+        # Check for required secrets (without exposing their values)
+        if [ -z "${{ secrets.DATABASE_CONNECTION_STRING }}" ]; then
+          echo "❌ DATABASE_CONNECTION_STRING is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ DATABASE_CONNECTION_STRING is configured"
+        fi
+        
+        if [ -z "${{ secrets.JWT_SECRET_KEY }}" ]; then
+          echo "❌ JWT_SECRET_KEY is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ JWT_SECRET_KEY is configured"
+        fi
+        
+        if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+          echo "❌ OPENAI_API_KEY is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ OPENAI_API_KEY is configured"
+        fi
+        
+        if [ -z "${{ secrets.AZURE_CREDENTIALS }}" ]; then
+          echo "❌ AZURE_CREDENTIALS is not set"
+          MISSING_SECRETS=1
+        else
+          echo "✅ AZURE_CREDENTIALS is configured"
+        fi
+        
+        if [ $MISSING_SECRETS -eq 1 ]; then
+          echo ""
+          echo "❌ Missing required secrets. Please configure them in GitHub repository settings."
+          exit 1
+        fi
+        
+        echo ""
+        echo "✅ All required secrets are configured"
+
+    - name: Configure Azure App Service Settings (Production)
+      uses: azure/appservice-settings@v1
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        app-settings-json: |
+          [
+            {
+              "name": "ConnectionStrings__DefaultConnection",
+              "value": "${{ secrets.DATABASE_CONNECTION_STRING }}",
+              "slotSetting": false
+            },
+            {
+              "name": "JwtSettings__SecretKey",
+              "value": "${{ secrets.JWT_SECRET_KEY }}",
+              "slotSetting": false
+            },
+            {
+              "name": "JwtSettings__Issuer",
+              "value": "SmartTask-AI-Production",
+              "slotSetting": false
+            },
+            {
+              "name": "JwtSettings__Audience",
+              "value": "SmartTask-AI-Users",
+              "slotSetting": false
+            },
+            {
+              "name": "OpenAi__ApiKey",
+              "value": "${{ secrets.OPENAI_API_KEY }}",
+              "slotSetting": false
+            },
+            {
+              "name": "ASPNETCORE_ENVIRONMENT",
+              "value": "Production",
+              "slotSetting": false
             }
-          },
-          "Logging": {
-            "LogLevel": {
-              "Default": "Information",
-              "Microsoft.AspNetCore": "Warning",
-              "SmartTask.AI.Api": "Information"
-            }
-          },
-          "AllowedHosts": "*"
-        }
-        EOF
-        
-        echo "? Production configuration created successfully"
-        echo "Configuration file size: $(wc -l < ./publish/appsettings.Production.json) lines"
-        
-        # Verify configuration structure without exposing secrets
-        echo "Configuration structure verified:"
-        grep -c "ConnectionStrings\|JwtSettings\|OpenAi" ./publish/appsettings.Production.json || true
+          ]
 
     - name: Deploy to Azure Web App (Production)
       uses: azure/webapps-deploy@v3
@@ -188,7 +312,7 @@ jobs:
 
     - name: Run production health checks
       run: |
-        echo "Running production health checks..."
+        echo "🔍 Running production health checks..."
         sleep 60 # Give app more time to start
         
         APP_URL="https://smarttask-ai-api-h7evagcdc3e2hrek.centralindia-01.azurewebsites.net"
@@ -197,20 +321,37 @@ jobs:
         for i in {1..10}; do
           echo "Health check attempt $i of 10..."
           
-          # Try the health endpoint
-          if curl -f -m 30 "$APP_URL/health" 2>/dev/null; then
-            echo "? Health check passed!"
+          # Try the health endpoint with detailed error output
+          if curl -f -m 30 -v "$APP_URL/health" 2>&1 | tee /tmp/health_check.log; then
+            echo "✅ Health check passed!"
+            echo "✅ Application is running successfully"
             break
           else
-            echo "?? Health check attempt $i failed"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 30 "$APP_URL/health" || echo "000")
+            echo "❌ Health check attempt $i failed with HTTP code: $HTTP_CODE"
+            
+            # Decode common HTTP error codes
+            case $HTTP_CODE in
+              000)
+                echo "   Connection failed - App may be starting or crashed"
+                ;;
+              500)
+                echo "   Internal Server Error - Check application logs for startup exceptions"
+                ;;
+              502)
+                echo "   Bad Gateway - App container may not be responding"
+                ;;
+              503)
+                echo "   Service Unavailable - App is still starting up"
+                ;;
+              *)
+                echo "   Unexpected error code"
+                ;;
+            esac
             
             # Try just the root endpoint
-            if curl -f -m 30 "$APP_URL" 2>/dev/null; then
-              echo "? App is responding at root URL"
-              break
-            else
-              echo "? App not responding"
-            fi
+            ROOT_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 30 "$APP_URL" || echo "000")
+            echo "Root endpoint HTTP code: $ROOT_CODE"
             
             if [ $i -lt 10 ]; then
               echo "Retrying in 30 seconds..."
@@ -219,7 +360,22 @@ jobs:
           fi
           
           if [ $i -eq 10 ]; then
-            echo "? All health checks failed after 10 attempts"
+            echo ""
+            echo "❌ All health checks failed after 10 attempts"
+            echo ""
+            echo "📋 Troubleshooting steps:"
+            echo "1. Check Azure App Service logs:"
+            echo "   az webapp log tail --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group <your-resource-group>"
+            echo ""
+            echo "2. Verify Application Settings in Azure Portal:"
+            echo "   - ConnectionStrings__DefaultConnection"
+            echo "   - JwtSettings__SecretKey"
+            echo "   - OpenAi__ApiKey"
+            echo ""
+            echo "3. Check if ASPNETCORE_ENVIRONMENT is set to 'Production'"
+            echo ""
+            echo "4. Review deployment logs in Azure Portal"
+            echo ""
             echo "Deployment completed but app may need manual configuration."
           fi
         done
