@@ -6,7 +6,7 @@
         private readonly string _requiredRole;
         private readonly ILogger<RoleAuthorizationMiddleware> _logger;
 
-        public RoleAuthorizationMiddleware(RequestDelegate next, string requiredRole, ILogger<RoleAuthorizationMiddleware> logger = null)
+        public RoleAuthorizationMiddleware(RequestDelegate next, string requiredRole, ILogger<RoleAuthorizationMiddleware>? logger = null)
         {
             _next = next;
             _requiredRole = requiredRole;
