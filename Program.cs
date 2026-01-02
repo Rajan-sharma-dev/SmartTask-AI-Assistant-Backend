@@ -17,6 +17,7 @@ builder.Configuration.AddEnvironmentVariables();
 
 // Add services to the container
 builder.Services.AddControllers();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -190,6 +191,13 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "healthy",
+    timestamp = DateTime.UtcNow,
+    environment = app.Environment.EnvironmentName
+}));
 
 
 Console.WriteLine($"🚀 Starting SmartTask AI Assistant API - Environment: {app.Environment.EnvironmentName}");
