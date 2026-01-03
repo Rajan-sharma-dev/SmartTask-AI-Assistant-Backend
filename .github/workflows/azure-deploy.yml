@@ -216,10 +216,12 @@ jobs:
         name: .net-app
         path: ./publish
 
-    - name: Azure Login for Production Configuration
-      uses: azure/login@v1
+    - name: Deploy to Azure Web App (Production)
+      uses: azure/webapps-deploy@v3
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PRODUCTION }}
+        package:  ./publish
 
     - name: Verify production deployment prerequisites
       run: |
