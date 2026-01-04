@@ -261,7 +261,7 @@ app.UsePromptManagement(app.Configuration);
 // 📁 Enable static files (for database-management.html and other static content)
 app.UseStaticFiles();
 
-// ?? Use Cookie Policy (for automatic token management)
+
 app.UseCookiePolicy();
 
 // Add middleware in correct order
