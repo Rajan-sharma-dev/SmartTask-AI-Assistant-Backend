@@ -267,76 +267,76 @@ jobs:
         echo ""
         echo "✅ All required secrets are configured"
 
+    
 
-
-    - name: Configure Azure App Service Settings (Production)
-      run: |
-        echo "Configuring production appsettings..."
+    # - name: Configure Azure App Service Settings (Production)
+    #   run: |
+    #     echo "Configuring production appsettings..."
         
-        # List available files to debug
-        echo "Available files in publish directory:"
-        ls -la ./publish/
-        find ./publish/ -name "appsettings*.json"
+    #     List available files to debug
+    #     echo "Available files in publish directory:"
+    #     ls -la ./publish/
+    #     find ./publish/ -name "appsettings*.json"
         
-        # Create appsettings.Production.json with actual values (avoiding sed issues)
-        cat > ./publish/appsettings.Production.json << 'EOF'
-        {
-          "ConnectionStrings": {
-            "DefaultConnection": "${{ secrets.DATABASE_CONNECTION_STRING }}"
-          },
-          "JwtSettings": {
-            "SecretKey": "${{ secrets.JWT_SECRET_KEY }}",
-            "Issuer": "SmartTask-AI-Production",
-            "Audience": "SmartTask-AI-Users",
-            "AccessTokenExpirationMinutes": 60,
-            "RefreshTokenExpirationDays": 7
-          },
-          "OpenAi": {
-            "ApiKey": "${{ secrets.OPENAI_API_KEY }}",
-            "BaseUrl": "https://api.openai.com/v1",
-            "DefaultModel": "gpt-4o-mini",
-            "ImageModel": "gpt-4-vision-preview",
-            "MaxTokens": 1500,
-            "Temperature": 0.7,
-            "TopP": 1.0,
-            "TimeoutSeconds": 30,
-            "EnableStreaming": true,
-            "EnableModeration": true,
-            "RequestsPerMinute": 60,
-            "RequestsPerDay": 1000,
-            "EnablePersonalization": true,
-            "EnableCodeAnalysis": true,
-            "DefaultProjectContext": "SmartTask AI Assistant - Intelligent task management system"
-          },
-          "SmartTaskSettings": {
-            "ApplicationName": "SmartTask AI Assistant",
-            "Version": "1.0.0",
-            "Environment": "Production",
-            "Features": {
-              "EnableChatHistory": true,
-              "EnableAITaskResolution": true,
-              "EnableProactiveAssistance": true,
-              "MaxChatHistoryDays": 30,
-              "MaxTasksPerUser": 1000
-            }
-          },
-          "Logging": {
-            "LogLevel": {
-              "Default": "Information",
-              "Microsoft.AspNetCore": "Warning",
-              "SmartTask.AI.Api": "Information"
-            }
-          },
-          "AllowedHosts": "*"
-        }
-        EOF
+    #     Create appsettings.Production.json with actual values (avoiding sed issues)
+    #     cat > ./publish/appsettings.Production.json << 'EOF'
+    #     {
+    #       "ConnectionStrings": {
+    #         "DefaultConnection": "${{ secrets.DATABASE_CONNECTION_STRING }}"
+    #       },
+    #       "JwtSettings": {
+    #         "SecretKey": "${{ secrets.JWT_SECRET_KEY }}",
+    #         "Issuer": "SmartTask-AI-Production",
+    #         "Audience": "SmartTask-AI-Users",
+    #         "AccessTokenExpirationMinutes": 60,
+    #         "RefreshTokenExpirationDays": 7
+    #       },
+    #       "OpenAi": {
+    #         "ApiKey": "${{ secrets.OPENAI_API_KEY }}",
+    #         "BaseUrl": "https://api.openai.com/v1",
+    #         "DefaultModel": "gpt-4o-mini",
+    #         "ImageModel": "gpt-4-vision-preview",
+    #         "MaxTokens": 1500,
+    #         "Temperature": 0.7,
+    #         "TopP": 1.0,
+    #         "TimeoutSeconds": 30,
+    #         "EnableStreaming": true,
+    #         "EnableModeration": true,
+    #         "RequestsPerMinute": 60,
+    #         "RequestsPerDay": 1000,
+    #         "EnablePersonalization": true,
+    #         "EnableCodeAnalysis": true,
+    #         "DefaultProjectContext": "SmartTask AI Assistant - Intelligent task management system"
+    #       },
+    #       "SmartTaskSettings": {
+    #         "ApplicationName": "SmartTask AI Assistant",
+    #         "Version": "1.0.0",
+    #         "Environment": "Production",
+    #         "Features": {
+    #           "EnableChatHistory": true,
+    #           "EnableAITaskResolution": true,
+    #           "EnableProactiveAssistance": true,
+    #           "MaxChatHistoryDays": 30,
+    #           "MaxTasksPerUser": 1000
+    #         }
+    #       },
+    #       "Logging": {
+    #         "LogLevel": {
+    #           "Default": "Information",
+    #           "Microsoft.AspNetCore": "Warning",
+    #           "SmartTask.AI.Api": "Information"
+    #         }
+    #       },
+    #       "AllowedHosts": "*"
+    #     }
+    #     EOF
         
-        echo "? Production configuration created successfully"
-        echo "Configuration file size: $(wc -l < ./publish/appsettings.Production.json) lines"
+    #     echo "? Production configuration created successfully"
+    #     echo "Configuration file size: $(wc -l < ./publish/appsettings.Production.json) lines"
         
-        # Verify configuration structure without exposing secrets
-        echo "Configuration structure verified:"
-        grep -c "ConnectionStrings\|JwtSettings\|OpenAi" ./publish/appsettings.Production.json || true
+    #     Verify configuration structure without exposing secrets
+    #     echo "Configuration structure verified:"
+    #     grep -c "ConnectionStrings\|JwtSettings\|OpenAi" ./publish/appsettings.Production.json || true
 
     - name: Deploy to Azure Web App (Production)
       uses: azure/webapps-deploy@v3
