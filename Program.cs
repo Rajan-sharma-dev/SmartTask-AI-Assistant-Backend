@@ -1,6 +1,8 @@
 ﻿// C#
+using Dapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using MiddleWareWebApi;
@@ -242,33 +244,70 @@ app.Map("/SmartTask-AI", helloApp =>
     });
 });
 
-app.Map("/test-db",  value =>
+app.Map("/test-db", value =>
 {
     value.Run(async context =>
     {
+        context.Response.ContentType = "application/json";
+        
         var db = context.RequestServices.GetRequiredService<DapperContext>();
         try
         {
             using var connection = db.CreateConnection();
-            await context.Response.WriteAsync(
-                System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    status = connection,
-                    timestamp = DateTime.UtcNow
-                })
-            );
+            
+            // Cast to SqlConnection for async methods and additional properties
+            if (connection is SqlConnection sqlConnection)
+            {
+                // Actually test the database connection
+                var startTime = DateTime.UtcNow;
+                await sqlConnection.OpenAsync();
+                
+                // Execute a simple query to verify connectivity using Dapper
+                var result = await sqlConnection.QueryFirstOrDefaultAsync<int>("SELECT 1");
+                
+                var responseTime = DateTime.UtcNow - startTime;
+                
+                await context.Response.WriteAsync(
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        status = "Success",
+                        connectionState = sqlConnection.State.ToString(),
+                        testQuery = "SELECT 1",
+                        testResult = result.ToString(),
+                        responseTime = $"{responseTime.TotalMilliseconds:F2}ms",
+                        server = sqlConnection.DataSource,
+                        database = sqlConnection.Database,
+                        timestamp = DateTime.UtcNow
+                    }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })
+                );
+            }
+            else
+            {
+                // Fallback for non-SQL Server connections
+                connection.Open();
+                await context.Response.WriteAsync(
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        status = "Success",
+                        connectionState = connection.State.ToString(),
+                        testQuery = "Connection opened successfully",
+                        connectionType = connection.GetType().Name,
+                        timestamp = DateTime.UtcNow
+                    }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })
+                );
+            }
         }
         catch (Exception ex)
         {
-            context.Response.ContentType = "application/json";
             context.Response.StatusCode = 500;
             await context.Response.WriteAsync(
                 System.Text.Json.JsonSerializer.Serialize(new
                 {
                     status = "Error",
+                    errorType = ex.GetType().Name,
                     message = ex.Message,
                     timestamp = DateTime.UtcNow
-                })
+                }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })
             );
         }
     });
