@@ -1,13 +1,15 @@
 ﻿// C#
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using MiddleWareWebApi;
 using MiddleWareWebApi.data;
+using MiddleWareWebApi.Extensions;
 using MiddleWareWebApi.MiddleWare;
+using MiddleWareWebApi.Models.Configuration;
 using MiddleWareWebApi.Services;
 using MiddleWareWebApi.Services.Interfaces;
-using MiddleWareWebApi.Models.Configuration;
-using MiddleWareWebApi.Extensions;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -204,6 +206,21 @@ app.Map("/health", healthApp =>
                 status = "healthy",
                 timestamp = DateTime.UtcNow,
                 environment = app.Environment.EnvironmentName
+            })
+        );
+    });
+});
+
+app.Map("/settings", setting =>
+{
+    setting.Run(async context =>
+    {
+        await context.Response.WriteAsync(
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                jwtSettings = jwtSettings,
+                openAiSettings = openAiSettings,
+                connectionString = connectionString
             })
         );
     });
