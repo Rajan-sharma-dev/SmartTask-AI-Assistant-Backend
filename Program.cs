@@ -242,6 +242,25 @@ app.Map("/SmartTask-AI", helloApp =>
     });
 });
 
+app.MapGet("/test-db", (DapperContext db) =>
+{
+    try
+    {
+        using var connection = db.CreateConnection();
+        connection.Open();
+        var canConnect = connection.State == System.Data.ConnectionState.Open;
+        return Results.Ok(new
+        {
+            status = canConnect ? "Connected" : "Failed",
+            timestamp = DateTime.UtcNow
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 Console.WriteLine($"🚀 Starting SmartTask AI Assistant API - Environment: {app.Environment.EnvironmentName}");
 Console.WriteLine($"   Time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 
